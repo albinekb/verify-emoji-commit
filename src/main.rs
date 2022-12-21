@@ -1,14 +1,14 @@
 extern crate colored;
 extern crate emoji_commit_type;
 
-use emoji_commit_type::CommitType;
-
 use colored::*;
 
 use std::{env, process::exit};
 
 use std::error::Error;
 use std::fmt;
+
+mod commit_rules;
 
 #[derive(Debug)]
 struct EmojiCommitError {
@@ -36,20 +36,20 @@ impl Error for EmojiCommitError {
 }
 
 fn verify_commit(commit: &str) -> Result<(), EmojiCommitError> {
-    for commit_type in CommitType::iter_variants() {
-        if commit.starts_with(commit_type.emoji()) {
-            return Ok(());
-        }
+    let checked = commit_rules::check_message_with_emoji(&commit);
+
+    let not_passed_rules = checked.filter(|rule| !rule.pass);
+
+    let result = not_passed_rules
+        .map(|rule| rule.description)
+        .collect::<Vec<_>>()
+        .join("\r\n");
+
+    if result.len() == 0 {
+        return Ok(());
     }
 
-    let one_of = CommitType::iter_variants()
-        .map(|commit_type| commit_type.emoji())
-        .collect::<Vec<&str>>()
-        .join(", ");
-    Err(EmojiCommitError::new(&format!(
-        "Commit does not start with a valid commit type: {}",
-        one_of
-    )))
+    Err(EmojiCommitError::new(&result))
 }
 
 fn main() {
@@ -72,10 +72,6 @@ fn main() {
             }
             exit(0);
         }
-        // Err(e EmojiCommitError) => {
-        //     eprintln!("Error: {}", e);
-        //     exit(1);
-        // }
         Err(e) => {
             eprintln!("{} {}", "Error:".red(), e.to_string().red());
             exit(1);
