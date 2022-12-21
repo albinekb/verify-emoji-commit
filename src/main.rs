@@ -37,31 +37,39 @@ impl Error for EmojiCommitError {
 
 fn verify_commit(commit: &str) -> Result<(), EmojiCommitError> {
     for commit_type in CommitType::iter_variants() {
-        if commit.contains(commit_type.emoji()) {
+        if commit.starts_with(commit_type.emoji()) {
             return Ok(());
         }
     }
 
-    Err(EmojiCommitError::new(
-        "Commit does not contain a valid commit type",
-    ))
+    let one_of = CommitType::iter_variants()
+        .map(|commit_type| commit_type.emoji())
+        .collect::<Vec<&str>>()
+        .join(", ");
+    Err(EmojiCommitError::new(&format!(
+        "Commit does not start with a valid commit type: {}",
+        one_of
+    )))
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let print_success = env::var("PRINT_SUCCESS")
+        .unwrap_or("true".to_string())
+        .contains("true")
+        != false;
 
-    // let commit = &args[1];
-    let mut vec = args.clone();
+    let all_args: Vec<String> = env::args().collect();
 
-    vec.remove(0);
-
-    let commit: &String = &vec.join(" ").clone();
-
+    let mut args = all_args.clone();
+    args.remove(0);
+    let commit: &String = &args.join(" ").clone();
     let result = verify_commit(commit);
 
     match result {
         Ok(_) => {
-            println!("{} {}", "Commit:".green(), commit.green());
+            if print_success {
+                println!("{}", "Commit is valid".green());
+            }
             exit(0);
         }
         // Err(e EmojiCommitError) => {
@@ -69,7 +77,6 @@ fn main() {
         //     exit(1);
         // }
         Err(e) => {
-            println!("{} {}", "Commit:".red(), commit.red());
             eprintln!("{} {}", "Error:".red(), e.to_string().red());
             exit(1);
         }
